@@ -1,0 +1,28 @@
+# Temporary files
+~$*.docx
+~$*.xlsx
+*.tmp
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Claude Code
+.agents/
+
+# Large data files (optional, uncomment if needed)
+# *.xlsx
