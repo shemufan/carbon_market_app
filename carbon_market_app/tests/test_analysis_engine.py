@@ -4,6 +4,7 @@ import pandas as pd
 
 from analysis_engine import analyze_all_pairs
 from data_loader import apply_row_ranges, parse_row_ranges
+from exporter import to_excel_bytes
 from significance import add_significance, exact_binomtest_pvalue
 
 
@@ -17,7 +18,7 @@ class AnalysisEngineTests(unittest.TestCase):
             }
         )
 
-        result, combos = analyze_all_pairs(
+        result = analyze_all_pairs(
             df,
             min_ma=1,
             max_ma=2,
@@ -31,7 +32,6 @@ class AnalysisEngineTests(unittest.TestCase):
         self.assertEqual(day1["signal_count"], 1)
         self.assertEqual(day1["up_count"], 1)
         self.assertEqual(day1["down_count"], 0)
-        self.assertEqual(combos.iloc[0]["combo"], "1,1,-1")
 
     def test_down_cross_is_reverse_condition(self):
         df = pd.DataFrame(
@@ -43,7 +43,7 @@ class AnalysisEngineTests(unittest.TestCase):
             }
         )
 
-        result, _ = analyze_all_pairs(
+        result = analyze_all_pairs(
             df,
             min_ma=1,
             max_ma=2,
@@ -83,8 +83,76 @@ class AnalysisEngineTests(unittest.TestCase):
         self.assertTrue(bool(enriched.loc[0, "is_significant"]))
         self.assertAlmostEqual(enriched.loc[0, "jeffreys_up_prob"], 9.5 / 11)
 
+    def test_significance_detects_all_down_days(self):
+        df = pd.DataFrame(
+            [
+                {
+                    "pair": "1/2",
+                    "cross_type": "down",
+                    "day": 1,
+                    "signal_count": 9,
+                    "up_count": 0,
+                    "down_count": 9,
+                    "flat_count": 0,
+                    "up_ratio": 0.0,
+                    "down_ratio": 1.0,
+                }
+            ]
+        )
+
+        enriched = add_significance(df, alpha=0.1)
+
+        self.assertLess(enriched.loc[0, "p_value"], 0.01)
+        self.assertTrue(bool(enriched.loc[0, "is_significant"]))
+        self.assertAlmostEqual(enriched.loc[0, "jeffreys_down_prob"], 0.95)
+
+    def test_significance_does_not_flag_balanced_counts(self):
+        df = pd.DataFrame(
+            [
+                {
+                    "pair": "1/2",
+                    "cross_type": "up",
+                    "day": 1,
+                    "signal_count": 10,
+                    "up_count": 5,
+                    "down_count": 5,
+                    "flat_count": 0,
+                    "up_ratio": 0.5,
+                    "down_ratio": 0.5,
+                }
+            ]
+        )
+
+        enriched = add_significance(df, alpha=0.1)
+
+        self.assertEqual(enriched.loc[0, "p_value"], 1.0)
+        self.assertFalse(bool(enriched.loc[0, "is_significant"]))
+
     def test_exact_binomtest_matches_two_sided_coin_example(self):
         self.assertAlmostEqual(exact_binomtest_pvalue(9, 10, 0.5), 0.021484375)
+
+    def test_mvp_excel_export_returns_bytes(self):
+        df = pd.DataFrame(
+            {
+                "pair": ["1/2"],
+                "cross_type": ["up"],
+                "day": [1],
+                "signal_count": [1],
+                "up_count": [1],
+                "down_count": [0],
+                "flat_count": [0],
+                "up_ratio": [1.0],
+                "down_ratio": [0.0],
+                "p_value": [1.0],
+                "is_significant": [False],
+                "jeffreys_up_prob": [0.75],
+                "jeffreys_down_prob": [0.25],
+            }
+        )
+
+        data = to_excel_bytes(df, df[df["is_significant"]])
+
+        self.assertGreater(len(data), 1000)
 
 
 if __name__ == "__main__":
