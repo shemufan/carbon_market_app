@@ -2,7 +2,7 @@ import unittest
 
 import pandas as pd
 
-from analysis_engine import analyze_all_pairs
+from analysis_engine import AnalysisThresholds, analyze_all_pairs
 from data_loader import apply_row_ranges, parse_row_ranges
 from exporter import to_excel_bytes
 from significance import add_significance, exact_binomtest_pvalue
@@ -55,6 +55,106 @@ class AnalysisEngineTests(unittest.TestCase):
         self.assertEqual(day1["cross_type"], "down")
         self.assertEqual(day1["up_count"], 1)
         self.assertEqual(day1["down_count"], 0)
+
+    def test_future_days_compare_against_previous_day_not_cross_day(self):
+        df = pd.DataFrame(
+            {
+                # Descending date order: index 3 is the cross day. Days after
+                # the signal are index 2, 1, 0 with prices 110, 105, 120.
+                "Mean": [120, 105, 110, 100, 95],
+                "Mean1": [12, 12, 12, 12, 8],
+                "Mean2": [10, 10, 10, 10, 10],
+            }
+        )
+
+        result = analyze_all_pairs(
+            df,
+            min_ma=1,
+            max_ma=2,
+            cross_types=["up"],
+            alpha=0.1,
+        )
+
+        day1 = result.loc[result["day"] == 1].iloc[0]
+        day2 = result.loc[result["day"] == 2].iloc[0]
+        day3 = result.loc[result["day"] == 3].iloc[0]
+
+        self.assertEqual(day1["up_count"], 1)
+        self.assertEqual(day1["down_count"], 0)
+        self.assertEqual(day2["up_count"], 0)
+        self.assertEqual(day2["down_count"], 1)
+        self.assertEqual(day3["up_count"], 1)
+        self.assertEqual(day3["down_count"], 0)
+
+    def test_threshold_screening_changes_when_thresholds_change(self):
+        df = pd.DataFrame(
+            {
+                "Mean": [99, 101, 102, 100, 98],
+                "Mean1": [12, 12, 12, 12, 8],
+                "Mean2": [10, 10, 10, 10, 10],
+            }
+        )
+
+        loose_result = analyze_all_pairs(
+            df,
+            min_ma=1,
+            max_ma=2,
+            cross_types=["up"],
+            alpha=0.1,
+            thresholds=AnalysisThresholds(high=60, low=40, three_day=25),
+        )
+        strict_result = analyze_all_pairs(
+            df,
+            min_ma=1,
+            max_ma=2,
+            cross_types=["up"],
+            alpha=0.1,
+            thresholds=AnalysisThresholds(high=101, low=-1, three_day=25),
+        )
+
+        loose_day1 = loose_result.loc[loose_result["day"] == 1].iloc[0]
+        strict_day1 = strict_result.loc[strict_result["day"] == 1].iloc[0]
+
+        self.assertTrue(bool(loose_day1["threshold_triggered"]))
+        self.assertIn("up_ratio > 60%", loose_day1["threshold_alerts"])
+        self.assertFalse(bool(strict_day1["threshold_triggered"]))
+        self.assertEqual(strict_day1["threshold_alerts"], "")
+
+    def test_three_day_threshold_screens_complete_combo_on_day3(self):
+        df = pd.DataFrame(
+            {
+                # One up-cross at index 3. The following three days form
+                # combo 1,-1,1: 100 -> 110 -> 105 -> 120.
+                "Mean": [120, 105, 110, 100, 95],
+                "Mean1": [12, 12, 12, 12, 8],
+                "Mean2": [10, 10, 10, 10, 10],
+            }
+        )
+
+        loose_result = analyze_all_pairs(
+            df,
+            min_ma=1,
+            max_ma=2,
+            cross_types=["up"],
+            alpha=0.1,
+            thresholds=AnalysisThresholds(high=101, low=-1, three_day=50),
+        )
+        strict_result = analyze_all_pairs(
+            df,
+            min_ma=1,
+            max_ma=2,
+            cross_types=["up"],
+            alpha=0.1,
+            thresholds=AnalysisThresholds(high=101, low=-1, three_day=100),
+        )
+
+        loose_day3 = loose_result.loc[loose_result["day"] == 3].iloc[0]
+        strict_day3 = strict_result.loc[strict_result["day"] == 3].iloc[0]
+
+        self.assertTrue(bool(loose_day3["threshold_triggered"]))
+        self.assertIn("3day_combo 1,-1,1 > 50%", loose_day3["threshold_alerts"])
+        self.assertFalse(bool(strict_day3["threshold_triggered"]))
+        self.assertEqual(strict_day3["threshold_alerts"], "")
 
     def test_parse_and_apply_row_ranges(self):
         df = pd.DataFrame({"Mean": range(5)})

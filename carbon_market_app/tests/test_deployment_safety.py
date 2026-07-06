@@ -24,7 +24,14 @@ class DeploymentSafetyTests(unittest.TestCase):
 
         self.assertIn("st.file_uploader", app_source)
         self.assertIn("st.session_state", app_source)
+        self.assertIn("make_data_key(data_source", app_source)
+        self.assertIn('APP_DIR / "sample_data" / "carbon_market_sample.xlsx"', app_source)
         self.assertNotIn("st.cache_data", app_source)
+
+    def test_sample_excel_exists_for_default_data_mode(self):
+        sample_path = PROJECT_ROOT / "sample_data" / "carbon_market_sample.xlsx"
+
+        self.assertTrue(sample_path.exists())
 
     def test_exporter_uses_in_memory_excel_buffer(self):
         exporter_source = (PROJECT_ROOT / "exporter.py").read_text(encoding="utf-8")
