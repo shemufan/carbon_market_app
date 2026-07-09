@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from math import comb
+
 import pandas as pd
-from scipy.stats import binomtest
 
 
 SIGNIFICANCE_COLUMNS = [
@@ -12,19 +13,29 @@ SIGNIFICANCE_COLUMNS = [
 ]
 
 
-def exact_binomtest_pvalue(success_count: int, valid_count: int, p: float = 0.5) -> float:
-    """Return a two-sided exact binomial-test p-value.
+def exact_binomial_point_probability(observed_count: int, valid_count: int, p: float = 0.5) -> float:
+    """Return the exact single-point binomial probability.
 
-    We use scipy.stats.binomtest with alternative="two-sided". The null
-    hypothesis is that up and down are equally likely, p=0.5. For this project,
-    "success_count" is the larger of up_count/down_count, so the test asks
-    whether the observed imbalance is unusually far from 50/50 in either
-    direction.
+    Project requirement: p_value uses the probability of observing exactly the
+    current up/down split, not a one-sided or two-sided tail probability. With
+    p=0.5, using up_count or down_count gives the same point probability.
     """
     if valid_count <= 0:
         return 1.0
 
-    return float(binomtest(success_count, valid_count, p=p, alternative="two-sided").pvalue)
+    if observed_count < 0 or observed_count > valid_count:
+        return 0.0
+
+    return float(
+        comb(valid_count, observed_count)
+        * (p ** observed_count)
+        * ((1 - p) ** (valid_count - observed_count))
+    )
+
+
+def exact_binomtest_pvalue(success_count: int, valid_count: int, p: float = 0.5) -> float:
+    """Backward-compatible alias for the current p_value calculation."""
+    return exact_binomial_point_probability(success_count, valid_count, p=p)
 
 
 def add_significance(results: pd.DataFrame, alpha: float) -> pd.DataFrame:
@@ -34,7 +45,7 @@ def add_significance(results: pd.DataFrame, alpha: float) -> pd.DataFrame:
     already represent one pair + cross_type + day combination and include
     up_count, down_count, flat_count, up_ratio, and down_ratio.
 
-    Flat counts are ignored for the binomial test:
+    Flat counts are ignored for the point-probability calculation:
         valid_count = up_count + down_count
 
     The returned DataFrame keeps all original columns and appends p_value,
@@ -60,8 +71,8 @@ def add_significance(results: pd.DataFrame, alpha: float) -> pd.DataFrame:
             jeffreys_up_prob = None
             jeffreys_down_prob = None
         else:
-            success_count = max(up_count, down_count)
-            p_value = exact_binomtest_pvalue(success_count, valid_count, p=0.5)
+            observed_count = max(up_count, down_count)
+            p_value = exact_binomial_point_probability(observed_count, valid_count, p=0.5)
             jeffreys_up_prob = (up_count + 0.5) / (valid_count + 1)
             jeffreys_down_prob = (down_count + 0.5) / (valid_count + 1)
 

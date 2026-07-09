@@ -5,7 +5,7 @@ import pandas as pd
 from analysis_engine import AnalysisThresholds, analyze_all_pairs
 from data_loader import apply_row_ranges, parse_row_ranges
 from exporter import to_excel_bytes
-from significance import add_significance, exact_binomtest_pvalue
+from significance import add_significance, exact_binomial_point_probability
 
 
 class AnalysisEngineTests(unittest.TestCase):
@@ -225,11 +225,17 @@ class AnalysisEngineTests(unittest.TestCase):
 
         enriched = add_significance(df, alpha=0.1)
 
-        self.assertEqual(enriched.loc[0, "p_value"], 1.0)
+        self.assertAlmostEqual(enriched.loc[0, "p_value"], 0.24609375)
         self.assertFalse(bool(enriched.loc[0, "is_significant"]))
 
-    def test_exact_binomtest_matches_two_sided_coin_example(self):
-        self.assertAlmostEqual(exact_binomtest_pvalue(9, 10, 0.5), 0.021484375)
+    def test_exact_point_probability_matches_coin_example(self):
+        self.assertAlmostEqual(exact_binomial_point_probability(9, 10, 0.5), 0.009765625)
+
+    def test_exact_point_probability_matches_project_example(self):
+        self.assertAlmostEqual(
+            exact_binomial_point_probability(18, 59, 0.5),
+            0.0011232693525645,
+        )
 
     def test_mvp_excel_export_returns_bytes(self):
         df = pd.DataFrame(

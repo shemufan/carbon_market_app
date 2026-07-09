@@ -14,12 +14,8 @@ def to_excel_bytes(
     buffer = BytesIO()
     with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
         if threshold_results is not None:
-            threshold_results.to_excel(
-                writer, index=False, sheet_name="threshold_results"
-            )
-        significant_results.to_excel(
-            writer, index=False, sheet_name="significant_results"
-        )
+            threshold_results.to_excel(writer, index=False, sheet_name="threshold_results")
+        significant_results.to_excel(writer, index=False, sheet_name="significant_results")
         all_results.to_excel(writer, index=False, sheet_name="all_results")
 
         workbook = writer.book

@@ -28,7 +28,7 @@ Excel 至少需要包含：
 
 当前默认 Excel 按日期倒序排列：`shift(-1)` 表示昨天，交叉行索引减 1/2/3 表示交叉后的第 1/2/3 天。如果数据改成日期正序，需要调整 `analysis_engine.py` 中的索引方向。
 
-`threshold_high`、`threshold_low`、`threshold_3day` 是阈值初筛参数，`alpha` 是最终显著性检验阈值，当前逻辑会先进行初筛再显著性选择。结果表会对 day=1/2/3 的 `up_ratio` 和 `down_ratio` 做初筛：比例百分比大于 `threshold_high` 或小于 `threshold_low` 时，`threshold_triggered` 为 `True`，触发原因写入 `threshold_alerts`。程序同时也会计算完整三日涨跌组合，例如 `1,-1,1`，当组合占比大于 `threshold_3day` 时，在 day=3 行写入三日组合提醒。而最终显著结果由二项检验 `p_value < alpha` 决定。
+`threshold_high`、`threshold_low`、`threshold_3day` 是阈值初筛参数，`alpha` 是最终显著性筛选阈值，当前逻辑会先进行初筛再显著性选择。结果表会对 day=1/2/3 的 `up_ratio` 和 `down_ratio` 做初筛：比例百分比大于 `threshold_high` 或小于 `threshold_low` 时，`threshold_triggered` 为 `True`，触发原因写入 `threshold_alerts`。程序同时也会计算完整三日涨跌组合，例如 `1,-1,1`，当组合占比大于 `threshold_3day` 时，在 day=3 行写入三日组合提醒。而最终显著结果由单点二项概率 `p_value < alpha` 决定。
 
 ## 本地运行（建议使用虚拟环境）
 
@@ -61,9 +61,9 @@ streamlit run app.py
 | `down_ratio` | 下跌比例，等于 `down_count / 可计算样本数`。 |
 | `threshold_triggered` | 是否触发阈值初筛。 |
 | `threshold_alerts` | 触发阈值初筛的具体原因，例如 `up_ratio > 60%`。 |
-| `p_value` | 二项检验 p 值，用于判断上涨/下跌偏向是否显著偏离 50/50。 |
+| `p_value` | 单点二项概率，表示在 50/50 假设下刚好出现当前上涨/下跌次数组合的概率。 |
 | `is_significant` | 最终显著性判断，当前规则为 `p_value < alpha`。 |
 | `jeffreys_up_prob` | Jeffreys 修正后的上涨概率估计，忽略持平样本。 |
 | `jeffreys_down_prob` | Jeffreys 修正后的下跌概率估计，忽略持平样本。 |
 
-其中，`up_ratio` 和 `down_ratio` 的分母包含持平样本；`p_value` 和 Jeffreys 概率计算时暂时忽略持平样本，只使用 `up_count + down_count` 作为有效样本数。
+其中，`up_ratio` 和 `down_ratio` 的分母包含持平样本；`p_value` 和 Jeffreys 概率计算时暂时忽略持平样本，只使用 `up_count + down_count` 作为有效样本数。当前 `p_value` 使用单点概率口径；如果后续需要切回双侧二项检验，可以集中修改 `significance.py` 中的 p 值计算函数。
